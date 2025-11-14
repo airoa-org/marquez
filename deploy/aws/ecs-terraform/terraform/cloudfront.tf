@@ -5,6 +5,7 @@ resource "aws_cloudfront_distribution" "marquez" {
   default_root_object = "/"
   comment             = "${local.name_prefix} CloudFront Distribution"
   price_class         = var.environment == "production" ? "PriceClass_All" : "PriceClass_100"
+  web_acl_id          = aws_wafv2_web_acl.marquez_basic_auth_waf.arn
 
   origin {
     domain_name = aws_alb.marquez.dns_name
@@ -269,6 +270,64 @@ resource "aws_cloudfront_distribution" "marquez" {
       Name = "${local.name_prefix}-cloudfront"
     }
   )
+}
+resource "aws_wafv2_web_acl" "marquez_basic_auth_waf" {
+  provider = aws.us_east_1
+  name     = "${local.name_prefix}-marquez-basic-auth-waf"
+  scope    = "CLOUDFRONT"
+
+  default_action {
+    allow {}
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "waf"
+    sampled_requests_enabled   = true
+  }
+
+  rule {
+    name     = "basic-auth"
+    priority = 0
+
+    action {
+      block {
+        custom_response {
+          response_code = 401
+          response_header {
+            name  = "www-authenticate"
+            value = "Basic"
+          }
+        }
+      }
+    }
+
+    statement {
+      not_statement {
+        statement {
+          byte_match_statement {
+            positional_constraint = "EXACTLY"
+            search_string         = "Basic ${local.base64_encoded_basic_credentials}"
+            field_to_match {
+              single_header {
+                name = "authorization"
+              }
+            }
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "basic-auth"
+      sampled_requests_enabled   = true
+    }
+  }
 }
 
 # Output for CloudFront domain

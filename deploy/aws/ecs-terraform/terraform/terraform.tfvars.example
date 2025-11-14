@@ -34,6 +34,10 @@ enable_deletion_protection = false  # false for sandbox/dev, true for production
 # OpenSearch Integration
 opensearch_enabled = false  # Enable if using OpenSearch for search functionality
 
+# Basic Authentication
+basic_authentication_id = "id"
+basic_authentication_password = "***********"
+
 # Tags
 tags = {
   Owner = "your-team"

@@ -6,10 +6,20 @@ terraform {
       version = "~> 5.0"
     }
   }
+  backend "s3" {
+    bucket = "terraform-marquez-project-419259426185"
+    region = "ap-northeast-1"
+    key    = "terraform.tfstate"
+  }
 }
 
 provider "aws" {
   region = var.region
+}
+
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
 }
 
 # Additional Variables for sensitive data
@@ -236,30 +246,30 @@ resource "aws_db_instance" "marquez" {
   engine         = "postgres"
   engine_version = "14"
   instance_class = var.database_instance_class
-  
+
   allocated_storage     = var.database_allocated_storage
   max_allocated_storage = var.database_allocated_storage * 10
   storage_type          = "gp3"
   storage_encrypted     = true
-  
+
   db_name  = "marquez"
   username = "marquez"
   password = var.db_password
-  
+
   vpc_security_group_ids = [aws_security_group.rds.id]
   db_subnet_group_name   = aws_db_subnet_group.main.name
-  
+
   backup_retention_period = var.backup_retention_period
-  backup_window          = "03:00-04:00"
-  maintenance_window     = "sun:04:00-sun:05:00"
-  
-  multi_az            = var.database_multi_az
-  deletion_protection = var.enable_deletion_protection
-  skip_final_snapshot = !var.enable_deletion_protection
+  backup_window           = "03:00-04:00"
+  maintenance_window      = "sun:04:00-sun:05:00"
+
+  multi_az                  = var.database_multi_az
+  deletion_protection       = var.enable_deletion_protection
+  skip_final_snapshot       = !var.enable_deletion_protection
   final_snapshot_identifier = var.enable_deletion_protection ? "${local.name_prefix}-final-${formatdate("YYYY-MM-DD-hhmm", timestamp())}" : null
-  
+
   enabled_cloudwatch_logs_exports = ["postgresql"]
-  
+
   tags = merge(
     local.common_tags,
     {
@@ -274,10 +284,10 @@ resource "aws_alb" "marquez" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id
+  subnets            = aws_subnet.private[*].id
 
-  enable_deletion_protection = var.enable_deletion_protection
-  enable_http2               = true
+  enable_deletion_protection       = var.enable_deletion_protection
+  enable_http2                     = true
   enable_cross_zone_load_balancing = true
 
   tags = local.common_tags
@@ -441,7 +451,7 @@ resource "aws_ecs_task_definition" "marquez_api" {
       name      = "marquez-api"
       image     = "${aws_ecr_repository.marquez_api.repository_url}:latest"
       essential = true
-      
+
       portMappings = [
         {
           containerPort = 5000
@@ -452,7 +462,7 @@ resource "aws_ecs_task_definition" "marquez_api" {
           protocol      = "tcp"
         }
       ]
-      
+
       environment = [
         {
           name  = "MARQUEZ_PORT"
@@ -487,14 +497,14 @@ resource "aws_ecs_task_definition" "marquez_api" {
           value = tostring(var.opensearch_enabled)
         }
       ]
-      
+
       secrets = [
         {
           name      = "POSTGRES_PASSWORD"
           valueFrom = aws_secretsmanager_secret.db_password.arn
         }
       ]
-      
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -503,7 +513,7 @@ resource "aws_ecs_task_definition" "marquez_api" {
           awslogs-stream-prefix = "ecs"
         }
       }
-      
+
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:5001/healthcheck || exit 1"]
         interval    = 30
@@ -531,14 +541,14 @@ resource "aws_ecs_task_definition" "marquez_web" {
       name      = "marquez-web"
       image     = "${aws_ecr_repository.marquez_web.repository_url}:latest"
       essential = true
-      
+
       portMappings = [
         {
           containerPort = 3000
           protocol      = "tcp"
         }
       ]
-      
+
       environment = [
         {
           name  = "MARQUEZ_HOST"
@@ -557,7 +567,7 @@ resource "aws_ecs_task_definition" "marquez_web" {
           value = "true"
         }
       ]
-      
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -566,7 +576,7 @@ resource "aws_ecs_task_definition" "marquez_web" {
           awslogs-stream-prefix = "ecs"
         }
       }
-      
+
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
         interval    = 30

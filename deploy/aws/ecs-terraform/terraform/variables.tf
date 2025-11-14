@@ -37,7 +37,7 @@ variable "enable_nat_gateway" {
 variable "nat_gateway_count" {
   description = "Number of NAT Gateways (1 for single NAT, 2 for HA)"
   type        = number
-  default     = 1  # Use 1 for sandbox/dev, 2 for production
+  default     = 1 # Use 1 for sandbox/dev, 2 for production
 }
 
 variable "database_instance_class" {
@@ -55,7 +55,7 @@ variable "database_allocated_storage" {
 variable "database_multi_az" {
   description = "Enable Multi-AZ for RDS"
   type        = bool
-  default     = false  # false for sandbox/dev, true for production
+  default     = false # false for sandbox/dev, true for production
 }
 
 variable "ecs_task_cpu" {
@@ -73,25 +73,36 @@ variable "ecs_task_memory" {
 variable "ecs_service_desired_count" {
   description = "Desired number of ECS service tasks"
   type        = number
-  default     = 1  # 1 for sandbox, 2+ for production
+  default     = 1 # 1 for sandbox, 2+ for production
 }
 
 variable "enable_deletion_protection" {
   description = "Enable deletion protection for RDS and ALB"
   type        = bool
-  default     = false  # false for sandbox/dev, true for production
+  default     = false # false for sandbox/dev, true for production
 }
 
 variable "backup_retention_period" {
   description = "RDS backup retention period in days"
   type        = number
-  default     = 1  # 1 for sandbox, 7+ for production
+  default     = 1 # 1 for sandbox, 7+ for production
 }
 
 variable "tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+variable "basic_authentication_id" {
+  description = "Basic authentication id"
+  type        = string
+}
+
+variable "basic_authentication_password" {
+  description = "Basic authentication password"
+  type        = string
+  sensitive   = true
 }
 
 locals {
@@ -103,6 +114,8 @@ locals {
     },
     var.tags
   )
-  
+
   name_prefix = "${var.project_name}-${var.environment}"
+
+  base64_encoded_basic_credentials = base64encode("${var.basic_authentication_id}:${var.basic_authentication_password}")
 }
